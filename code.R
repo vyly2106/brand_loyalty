@@ -18,6 +18,7 @@ library(effectsize)
 # Import data
 data <- read_sav("Exp+Res+2022+Idea+3+Manipulate+&+loyalty_May+9,+2022_14.59.sav")
 final_data <- data %>%
+  filter(Status==0) %>% 
   select(Prolific_ID:loyalty_DO_control, -comment)
 
 # Recode likert scales
