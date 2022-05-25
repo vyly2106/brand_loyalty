@@ -10,7 +10,8 @@ library(dplyr)
 library(car)
 library(emmeans)
 library(effectsize)
-
+library(tidyverse)
+library(cowplot)
 #########################
 ##### Data cleaning #####
 #########################
@@ -81,6 +82,122 @@ final_data <- final_data %>%
 #####################
 ##### Analysis #####
 ####################
+
+# # Hypothesis 1: The effect of consumption on brand loyalty is mediated by perceived relative rank
+# Whether relative rank can affect brand loyalty by increasing people's rank by 20 points
+
+## Path A: Consumption/purchase on perceived relative rank
+## assumptions checking:
+### Assumption 1: Homoskedasticity
+ggplot(final_data, aes(x=purchase, y=relative_rank_1)) +
+  geom_boxplot(outlier.colour="black",
+               outlier.size=2, notch=FALSE)
+
+#### Levene's test for homogeneity
+leveneTest(relative_rank_1 ~ purchase, final_data, center=mean)
+
+### Assumption 2: Normality
+#### Shapiro-Wilk test for normality
+shapiro.test(final_data$relative_rank_1)
+qqnorm(final_data$relative_rank_1, pch=1, frame=FALSE, xlim=c(-3,3))
+qqline(final_data$relative_rank_1, col="steelblue", lwd=2)
+
+### Anova test
+purchase_pcr_model <- lm(relative_rank_1 ~ purchase, data = final_data)
+Anova(purchase_pcr_model, type=3)
+
+final_data %>%
+  group_by(purchase) %>%
+  summarize(mean_ranks = mean(relative_rank_1)) %>%
+  ggplot(aes(x=purchase, y=mean_ranks)) +
+  geom_col(fill = c("dodgerblue4", "dodgerblue2", "cornflowerblue")) +
+  ylim(0,100) +
+  geom_hline(yintercept=50, linetype="dashed", 
+             color = "red", size=1)
+
+emmeans(purchase_pcr_model, pairwise ~ purchase, adjust="bonferroni")
+
+## Path B: Perceived relative rank on brand loyalty if people are told to increase their ranks by 20 points
+plot_grid(ggplot(data = final_data, aes(x=loyalty_DO_higher, y=jitter(brand_loyalty))) + geom_point(), 
+          ggplot(data = final_data, aes(x=relative_rank_1,y=brand_loyalty)) + geom_point())
+
+treated_group <- final_data %>%
+  filter(loyalty_DO_higher == 1) %>%
+  summarize(mean_loyalty = mean(brand_loyalty))
+
+control_group <- final_data %>%
+  filter(loyalty_DO_higher == 0) %>%
+  summarize(mean_loyalty = mean(brand_loyalty))
+
+## Average treatment effect
+ATE <- treated_group - control_group
+ATE
+### Not significantly different in perceived brand loyalty between the two groups
+### Need to perform a t-test to be sure
+
+## 2 sample t-test
+st.test(final_data$brand_loyalty[final_data$loyalty_DO_higher==1],
+       final_data$brand_loyalty[final_data$loyalty_DO_higher==0])
+### Cannot reject H0
+
+## Invest correlational relationship between relative rank and brand loyalty
+## Check LR assumptions:
+### Assumption 1: linearity
+ggplot(final_data, aes(x=relative_rank_1, y=scale(brand_loyalty))) +
+  geom_point() +
+  geom_jitter() +
+  geom_smooth(method = "lm", formula = y~x)
+
+### Assumption 2: Homoskedasticity
+plot(linear_model_1)
+
+## Regression of brand loyalty on relative rank
+linear_model_1 <- lm(scale(brand_loyalty) ~ relative_rank_1, final_data)
+summary(linear_model_1)
+
+linear_model_2 <- lm(scale(brand_loyalty) ~ relative_rank_1 + gender, final_data)
+summary(linear_model_2)
+
+
+# Part 2: Purchase types and NFU on Perceived relative rank
+final_data$product_choice <- as.factor(final_data$product_choice)
+final_data$product_choice <- factor(final_data$product_choice, levels = c(4,6,7),
+                            labels = c("Coffee", "Cola", "Tea"))
+final_data %>%
+  count(product_choice)
+
+final_data <- final_data %>%
+  mutate(
+    purchase = case_when(
+      product_choice == "Coffee" ~ "High_freq_purchased",
+      product_choice == "Cola" ~ "Low_freq_purchased",
+      product_choice == "Tea" ~ "Med_freq_purchased"
+    ),
+    purchase = as.factor(purchase)
+  )
+
+
+final_data %>%
+  group_by(purchase) %>%
+  summarize(PRR = mean(relative_rank_1))
+
+
+
+
+model_3 <- lm(relative_rank_1 ~ purchase+NFU, data = final_data)
+summary(model_3)
+
+model_4 <- lm(relative_rank_1 ~ NFU, data = final_data)
+summary(model_4)
+
+ggplot(final_data, aes(x=relative_rank_1)) +
+  geom_histogram(binwidth = 10)
+
+
+
+
+
+
 
 
 
